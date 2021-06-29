@@ -28,24 +28,25 @@ timeOnline = {}
 
 io.on('connection', (socket) => {
 
-	socket.on('join-call', (path) => {
+	socket.on('join-call', (path,username) => {
 		if(connections[path] === undefined){
 			connections[path] = []
 		}
-		connections[path].push(socket.id)
+		connections[path].push({socketid:socket.id,username:username})
 
 		timeOnline[socket.id] = new Date()
 
 		for(let a = 0; a < connections[path].length; ++a){
-			io.to(connections[path][a]).emit("user-joined", socket.id, connections[path])
+
+			 io.to(connections[path][a].socketid).emit("user-joined", socket.id, connections[path])
 		}
 
-		if(messages[path] !== undefined){
-			for(let a = 0; a < messages[path].length; ++a){
-				io.to(socket.id).emit("chat-message", messages[path][a]['data'], 
-					messages[path][a]['sender'], messages[path][a]['socket-id-sender'])
-			}
-		}
+		// if(messages[path] !== undefined){
+		// 	for(let a = 0; a < messages[path].length; ++a){
+		// 		io.to(socket.id).emit("chat-message", messages[path][a]['data'], 
+		// 			messages[path][a]['sender'], messages[path][a]['socket-id-sender'])
+		// 	}
+		// }
 
 		console.log(path, connections[path])
 	})
@@ -62,7 +63,7 @@ io.on('connection', (socket) => {
 		var ok = false
 		for (const [k, v] of Object.entries(connections)) {
 			for(let a = 0; a < v.length; ++a){
-				if(v[a] === socket.id){
+				if(v[a].socketid === socket.id){
 					key = k
 					ok = true
 				}
@@ -77,7 +78,7 @@ io.on('connection', (socket) => {
 			console.log("message", key, ":", sender, data)
 
 			for(let a = 0; a < connections[key].length; ++a){
-				io.to(connections[key][a]).emit("chat-message", data, sender, socket.id)
+				io.to(connections[key][a].socketid).emit("chat-message", data, sender, socket.id)
 			}
 		}
 	})
@@ -87,11 +88,12 @@ io.on('connection', (socket) => {
 		var key
 		for (const [k, v] of JSON.parse(JSON.stringify(Object.entries(connections)))) {
 			for(let a = 0; a < v.length; ++a){
-				if(v[a] === socket.id){
+				if(v[a].socketid === socket.id){
 					key = k
 
 					for(let a = 0; a < connections[key].length; ++a){
-						io.to(connections[key][a]).emit("user-left", socket.id)
+						console.log("user-left"+a)
+						io.to(connections[key][a].socketid).emit("user-left", socket.id)
 					}
 			
 					var index = connections[key].indexOf(socket.id)

@@ -38,7 +38,7 @@ class Video extends Component {
 		super(props)
 
 		this.localVideoref = React.createRef()
-
+		this.props.GetMedia();
 		this.videoAvailable = false
 		this.audioAvailable = false
 
@@ -121,8 +121,10 @@ class Video extends Component {
 
 		for (let id in connections) {
 			if (id === socketId) continue
+				// connections[id].addStream(window.localStream)
+				this.forceaddtrack(connections[id],window.localStream)
 
-			connections[id].addStream(window.localStream)
+			
 
 			connections[id].createOffer().then((description) => {
 				connections[id].setLocalDescription(description)
@@ -148,8 +150,10 @@ class Video extends Component {
 				this.localVideoref.current.srcObject = window.localStream
 
 				for (let id in connections) {
-					connections[id].addStream(window.localStream)
+						// connections[id].addStream(window.localStream)
+						this.forceaddtrack(connections[id],window.localStream)
 
+					
 					connections[id].createOffer().then((description) => {
 						connections[id].setLocalDescription(description)
 							.then(() => {
@@ -184,8 +188,10 @@ class Video extends Component {
 		for (let id in connections) {
 			if (id === socketId) continue
 
-			connections[id].addStream(window.localStream)
+				// connections[id].addStream(window.localStream)
+				this.forceaddtrack(connections[id],window.localStream)
 
+			
 			connections[id].createOffer().then((description) => {
 				connections[id].setLocalDescription(description)
 					.then(() => {
@@ -275,6 +281,7 @@ class Video extends Component {
 		socket.on('signal', this.gotMessageFromServer)
 
 		socket.on('connect', () => {
+			console.log(window.location.href)
 			socket.emit('join-call', window.location.href)
 			socketId = socket.id
 
@@ -293,6 +300,8 @@ class Video extends Component {
 
 			socket.on('user-joined', (id, clients) => {
 				clients.forEach((socketListId) => {
+			console.log(clients)
+
 					connections[socketListId] = new RTCPeerConnection(peerConnectionConfig)
 					// Wait for their ice candidate       
 					connections[socketListId].onicecandidate = function (event) {
@@ -302,8 +311,42 @@ class Video extends Component {
 					}
 
 					// Wait for their video stream
+					connections[socketListId].ontrack=(track=>{
+						Bindtrack(connections[socketListId],track).then(stream=>{
+						
+							var searchVidep = document.querySelector(`[data-socket="${socketListId}"]`)
+							if (searchVidep !== null) { // if i don't do this check it make an empyt square
+								searchVidep.srcObject = connections[socketListId].stream
+							} else {
+								elms = clients.length
+								let main = document.getElementById('main')
+								let cssMesure = this.changeCssVideos(main)
+	
+								let video = document.createElement('video')
+	
+								let css = {minWidth: cssMesure.minWidth, minHeight: cssMesure.minHeight, maxHeight: "100%", margin: "10px",
+									borderStyle: "solid", borderColor: "#bdbdbd", objectFit: "fill"}
+								for(let i in css) video.style[i] = css[i]
+	
+								video.style.setProperty("width", cssMesure.width)
+								video.style.setProperty("height", cssMesure.height)
+								video.setAttribute('data-socket', socketListId)
+								video.srcObject = connections[socketListId].stream
+								video.autoplay = true
+								video.playsinline = true
+	
+								main.appendChild(video)
+							}
+						})
+						
+						
+						
+					})
+					console.log(connections[socketListId])
+					// connections[socketListId].ontrack(track=>{console.log(track)});
 					connections[socketListId].onaddstream = (event) => {
 						// TODO mute button, full screen button
+						
 						var searchVidep = document.querySelector(`[data-socket="${socketListId}"]`)
 						if (searchVidep !== null) { // if i don't do this check it make an empyt square
 							searchVidep.srcObject = event.stream
@@ -328,14 +371,17 @@ class Video extends Component {
 							main.appendChild(video)
 						}
 					}
-
+					console.log(connections[socketListId])
 					// Add the local video stream
 					if (window.localStream !== undefined && window.localStream !== null) {
-						connections[socketListId].addStream(window.localStream)
+							// connections[socketListId].addStream(window.localStream)
+							this.forceaddtrack(connections[socketListId],window.localStream)
+						
 					} else {
 						let blackSilence = (...args) => new MediaStream([this.black(...args), this.silence()])
-						window.localStream = blackSilence()
-						connections[socketListId].addStream(window.localStream)
+						window.localStream = blackSilence();
+							this.forceaddtrack(connections[socketListId],window.localStream)
+						
 					}
 				})
 
@@ -344,7 +390,10 @@ class Video extends Component {
 						if (id2 === socketId) continue
 						
 						try {
-							connections[id2].addStream(window.localStream)
+								// connections[id2].addStream(window.localStream)
+								this.forceaddtrack(connections[id2],window.localStream)
+
+							
 						} catch(e) {}
 			
 						connections[id2].createOffer().then((description) => {
@@ -359,7 +408,35 @@ class Video extends Component {
 			})
 		})
 	}
+Bindtrack(connection,track){
+	return new Promise((resolve,reject)=>{
+		if(connection.stream){
+			if(track.receiver.track.kind=="video"){
+				if(connection.stream.getVideoTracks().length){
+					connection.stream.removeTrack(connection.stream.getVideoTracks()[0])
+					connection.stream.addTrack(track.receiver.track);
+				}else{
+					connection.stream.addTrack(track.receiver.track);
+				}
 
+			}
+			else{
+				if(connection.stream.getAudioTracks().length){
+					connection.stream.removeTrack(connection.stream.getAudioTracks()[0])
+					connection.stream.addTrack(track.receiver.track);
+				}else{
+					connection.stream.addTrack(track.receiver.track);
+				}
+			}
+			connection.stream.addTrack(track.receiver.track);
+			resolve(connection.stream)
+		}
+		else{
+			connection.stream=new MediaStream([track.receiver.track])
+			resolve(connection.stream)
+		}
+	})
+}
 	silence = () => {
 		let ctx = new AudioContext()
 		let oscillator = ctx.createOscillator()
@@ -392,6 +469,7 @@ class Video extends Component {
 	handleMessage = (e) => this.setState({ message: e.target.value })
 
 	addMessage = (data, sender, socketIdSender) => {
+
 		this.setState(prevState => ({
 			messages: [...prevState.messages, { "sender": sender, "data": data }],
 		}))
@@ -441,7 +519,11 @@ class Video extends Component {
 		// return matchChrome !== null || matchFirefox !== null
 		return matchChrome !== null
 	}
-
+	forceaddtrack(connection,stream){
+stream.getTracks().forEach(track=>{
+	connection.addTrack(track);
+})
+	}
 	render() {
 		
 		return (
