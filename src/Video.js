@@ -38,7 +38,6 @@ class Video extends Component {
 		super(props)
 
 		this.localVideoref = React.createRef()
-		this.props.GetMedia();
 		this.videoAvailable = false
 		this.audioAvailable = false
 
@@ -312,7 +311,7 @@ class Video extends Component {
 
 					// Wait for their video stream
 					connections[socketListId].ontrack=(track=>{
-						Bindtrack(connections[socketListId],track).then(stream=>{
+						this.Bindtrack(connections[socketListId],track).then(stream=>{
 						
 							var searchVidep = document.querySelector(`[data-socket="${socketListId}"]`)
 							if (searchVidep !== null) { // if i don't do this check it make an empyt square
@@ -520,6 +519,7 @@ Bindtrack(connection,track){
 		return matchChrome !== null
 	}
 	forceaddtrack(connection,stream){
+		alert(JSON.stringify(connection))
 stream.getTracks().forEach(track=>{
 	connection.addTrack(track);
 })
