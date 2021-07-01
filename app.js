@@ -28,26 +28,26 @@ timeOnline = {}
 
 io.on('connection', (socket) => {
 
-	socket.on('join-call', (path) => {
+	socket.on('join-call', (path,extra) => {
+		socket.join(path);
 		if(connections[path] === undefined){
-			connections[path] = []
+			connections[path] = {}
 		}
-		connections[path].push(socket.id)
+		connections[path][socket.id]=JSON.parse(extra)
 
 		timeOnline[socket.id] = new Date()
+		const clients = io.sockets.adapter.rooms[path].sockets;
+		console.log(clients)
+		
+			io.to(path).emit("user-joined", socket.id, clients,connections[path])
+			
+		// if(messages[path] !== undefined){
+		// 	for(let a = 0; a < messages[path].length; ++a){
+		// 		io.to(socket.id).emit("chat-message", messages[path][a]['data'], 
+		// 			messages[path][a]['sender'], messages[path][a]['socket-id-sender'])
+		// 	}
+		// }
 
-		for(let a = 0; a < connections[path].length; ++a){
-			io.to(connections[path][a]).emit("user-joined", socket.id, connections[path])
-		}
-
-		if(messages[path] !== undefined){
-			for(let a = 0; a < messages[path].length; ++a){
-				io.to(socket.id).emit("chat-message", messages[path][a]['data'], 
-					messages[path][a]['sender'], messages[path][a]['socket-id-sender'])
-			}
-		}
-
-		console.log(path, connections[path])
 	})
 
 	socket.on('signal', (toId, message) => {
@@ -74,7 +74,6 @@ io.on('connection', (socket) => {
 				messages[key] = []
 			}
 			messages[key].push({"sender": sender, "data": data, "socket-id-sender": socket.id})
-			console.log("message", key, ":", sender, data)
 
 			for(let a = 0; a < connections[key].length; ++a){
 				io.to(connections[key][a]).emit("chat-message", data, sender, socket.id)
@@ -97,7 +96,6 @@ io.on('connection', (socket) => {
 					var index = connections[key].indexOf(socket.id)
 					connections[key].splice(index, 1)
 
-					console.log(key, socket.id, Math.ceil(diffTime / 1000))
 
 					if(connections[key].length === 0){
 						delete connections[key]
